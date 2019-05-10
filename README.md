@@ -5,7 +5,7 @@ This is a Lambda function which supports an Alexa skill that I can use to find o
 
 It's far from a mature product, and it will require hacking on your part to get it working. If you're not on Octopus Energy, this won't be much use to you. If you get all excited about [their API](https://developer.octopus.energy/docs/api/#agile-octopus) and decide to sign up please consider using [my referral link](https://share.octopus.energy/pale-cobra-742). At the time of writing, we'd both get a £50 credit if you do!
 
-###Examples of Use
+### Examples of Use
 
 "Alexa, ask Octopus for the cheapest 3 hour slot"
  - "The cheapest 3 hour slot runs from 1pm to 4pm"
@@ -13,7 +13,7 @@ It's far from a mature product, and it will require hacking on your part to get 
 "Alexa, ask Octopus for the cheapest 90 minute slot"
  - "The cheapest 90 minute slot runs from 2:30pm to 4pm"
 
-###AWS Lambda Setup
+### AWS Lambda Setup
 
 The code itself is fairly small, but it makes use of packages that are not available  by default in the Lambda Python 3.7 environment. The following high level steps are required to get it up and running:
 
