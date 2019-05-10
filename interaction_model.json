@@ -1,0 +1,84 @@
+{
+    "interactionModel": {
+        "languageModel": {
+            "invocationName": "octopus",
+            "intents": [
+                {
+                    "name": "AMAZON.CancelIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.HelpIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.StopIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.NavigateHomeIntent",
+                    "samples": []
+                },
+                {
+                    "name": "FindCheapestSlot",
+                    "slots": [
+                        {
+                            "name": "Length",
+                            "type": "AMAZON.DURATION",
+                            "samples": [
+                                "thirty minutes",
+                                "ninety minutes",
+                                "half an hour",
+                                "two hours",
+                                "four hours"
+                            ]
+                        }
+                    ],
+                    "samples": [
+                        "{Length}",
+                        "a {Length} slot.",
+                        "when the cheapest {Length} slot is",
+                        "when the next {Length} slot is",
+                        "when is the next {Length} slot",
+                        "when is the cheapest {Length} slot",
+                        "what is the cheapest {Length} slot"
+                    ]
+                }
+            ],
+            "types": []
+        },
+        "dialog": {
+            "intents": [
+                {
+                    "name": "FindCheapestSlot",
+                    "delegationStrategy": "ALWAYS",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "Length",
+                            "type": "AMAZON.DURATION",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.188826335986.1249852441704"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "delegationStrategy": "ALWAYS"
+        },
+        "prompts": [
+            {
+                "id": "Elicit.Slot.188826335986.1249852441704",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "How long a slot are you looking for?"
+                    }
+                ]
+            }
+        ]
+    }
+}
