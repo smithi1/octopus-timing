@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import re
 
@@ -12,74 +13,90 @@ import datetime as dt
 
 from pytz import timezone
 
+postCodeLookupFile = 'PC2ED.csv'
 
 class OctopusEnergy:
 
 	octopusAPIVersion = '1'
-	postCodeLookupFile = 'PC2ED.csv'
 	baseURL = 'https://api.octopus.energy/v' + octopusAPIVersion + '/'
 	
 	productCode = None
 	tariffCode = None
 	tariffCosts = None
-	tariffCostLastRefresh = None
 
-	def __init__(self, postcode, noisy=False):
+	def __init__(self, postcode=None, distributorCode=None, noisy=False):
 	
-		nonAlphaRE = re.compile('[^A-Z0-9]+')
-		
-		# Initialise some instance variables.
-		self.postcode = nonAlphaRE.sub('', str(postcode).upper())
-		self.lookupTable = None # postcode to electricity distributor lookup
+		if all(v is None for v in {postcode, distributorCode}):
+			raise ValueError('Expected either postcode or distributorCode')
+	
+		self.noisy = noisy
 		self.productCode = None # Octopus Energy product code for Agile Octopus
 		self.tariffCode = None # Octopus Energy tariff code for user, derived from their postcode
-		self.noisy = noisy
-		
+	
+		# Postcode lookup table
+		lookupTable = pd.read_csv(postCodeLookupFile)
+			
+		# Handle distributorCode
+		if distributorCode == None:
+			self.distributorCode = None
+		else: 
+			# Check it's a distributor code that we know about.
+			if distributorCode not in lookupTable['AreaCodeLetter'].unique():
+				raise ValueError('"' + distributorCode + '" is not a known distributorCode')
+				
+			# Remember it	
+			self.distributorCode = distributorCode
+			
+			# Ignore any postcode that has been supplied, it's redundant.
+			postcode = None
+			
+			if self.noisy:
+				print('OctopusEnergy: Known distributorCode supplied as {}, ignoring any supplied postcode'.format(distributorCode))
+	
+		# Handle postcode
+		if postcode == None:
+			self.postcode = None
+		else:
+			nonAlphaRE = re.compile('[^A-Z0-9]+')
+
+			self.postcode = nonAlphaRE.sub('', str(postcode).upper())[:-3]
+			
+			if lookupTable['PostCode'].loc[lookupTable['PostCode'] == self.postcode].count() != 1:
+				raise ValueError('"' + postcode + '" is not a known postcode')
+				
+			self.distributorCode = lookupTable.loc[lookupTable['PostCode'] == self.postcode]['AreaCodeLetter'].min()
+			
+			if self.noisy:
+				print('OctopusEnergy: Postcode supplied as {}, distributor code looked up as {}'.format(self.postcode, self.distributorCode))
+
+	# Returns the time in the format required by the API, times not on the hour or
+	# half hour are rounded to the next one.		
+	def apiTimeFormat(t):
+	
+		if t.minute != 0 and t.minute != 30:
+			if t.minute < 30:
+				t = dt.datetime(t.year, t.month, t.day, t.hour, 30, 0)
+			else:
+				t = t + dt.timedelta(hours=1)
+				t = dt.datetime(t.year, t.month, t.day, t.hour, 0, 0)
+			
+		return t.strftime('%Y-%m-%dT%H:%M')
+	
 	# Return time period parameters for the API going from now until tomorrow night.
 	# Return format is params which can be plugged into API call
 	def nowUntilTomorrow(self):
 		
 		t = dt.datetime.now(timezone('Europe/London'))
+		tm = t + dt.timedelta(1)
+		tm = dt.datetime(tm.year, tm.month, tm.day, 23, 30, 0)
 
-		# if we're in the first half hour of an hour, then start on the next half hour.
-		# if we're in the second half hour of an hour, then start on the next hour.
-
-		# Might be nice to push to next slot if very close to the start of this one,
-		# but that's a future enhancement at this stage.
-		if t.minute < 30:
-			t = dt.datetime(t.year, t.month, t.day, t.hour, 30, 0)
-		else:
-			t = t + dt.timedelta(hours=1)
-			t = dt.datetime(t.year, t.month, t.day, t.hour, 0, 0)
-
-		tomorrow = (dt.date.today() + dt.timedelta(1)).strftime('%Y-%m-%dT23:30')	 
-		today = t.strftime('%Y-%m-%dT%H:%M')
-
+		today = OctopusEnergy.apiTimeFormat(t)
+		tomorrow = OctopusEnergy.apiTimeFormat(tm)
+		
 		return {
 			'period_from': today, 'period_to': tomorrow
 		}
 	
-	# Return the distributor code (something looking a bit like _M for the user's postcode)
-	def distributorLookup(self):
-
-		# First part of postcode is all we need.
-		pcprefix = self.postcode[:-3]
-
-		# Only want to do this once.
-		if self.lookupTable == None:
-			self.lookupTable = pd.read_csv(self.postCodeLookupFile, index_col='PostCode')
-		
-		try:
-			result = self.lookupTable.loc[pcprefix]
-		except KeyError:
-			print('OctopusEnergy: Postcode not found - {}'.format(pcprefix))
-			raise
-			
-		if self.noisy:
-			print('OctopusEnergy: found distributor code letter as {}'.format(result.AreaCodeLetter))
-			
-		return result.AreaCodeLetter
-		
 	# Get the "agile" product code. Currently there's only one, but this will need to 
 	# be revisited if more appear, so as to figure out which one to use. Currently 
 	# the first one returned is used.
@@ -131,7 +148,7 @@ class OctopusEnergy:
 				raise
 			
 			try:
-				self.tariffCode = resp.json()['single_register_electricity_tariffs'][self.distributorLookup()]['direct_debit_monthly']['code']
+				self.tariffCode = resp.json()['single_register_electricity_tariffs'][self.distributorCode]['direct_debit_monthly']['code']
 			except requests.exceptions.RequestException as e:
 				print('OctopusEnergy: Could not retrieve tariff from API results: {}'.format(str(e)))
 				raise
@@ -143,23 +160,11 @@ class OctopusEnergy:
 		
 		
 	# Retrieve tariff costs from API. Handles pagination in the API.
-	def octopusGetTariffCosts(self):
+	# Timings look like: {'period_from': '2019-05-11T12:00', 'period_to': '2019-05-12T23:30'}
+	# c/f t.strftime('%Y-%m-%dT%H:%M')
+	def octopusGetTariffCosts(self, timings):
 		
 		uktz = timezone('Europe/London')
-		
-		# We only need to retrieve these once per hour, unless it's the first attempt
-		# where the hour is 4pm, when the data is refreshed..
-		if self.tariffCostLastRefresh != None:
-
-			if self.tariffCostLastRefresh.hour == 15 and dt.datetime.now(tz=uktz).hour == 16:
-				_
-			else:
-				nextRefresh = self.tariffCostLastRefresh + dt.timedelta(hours=1)
-
-				if nextRefresh > dt.datetime.now(uktz):
-					if self.noisy:
-						print('OctopusEnergy: reusing tariff costs from before')
-					return self.tariffCosts
 					
 		# Initialise empty DataFrame
 		df = pd.DataFrame()
@@ -167,7 +172,9 @@ class OctopusEnergy:
 		url = self.baseURL + 'products/' + self.octopusGetProductCode() + '/electricity-tariffs/' + self.octopusGetTariffCode() + '/standard-unit-rates/'
 		
 		sleepTime = 0.3
-		params = self.nowUntilTomorrow()
+		
+		# May want more params at some point.
+		params = timings
 		
 		if self.noisy:
 			print('OctopusEnergy: attempting to get tariff costs from API')
@@ -231,7 +238,7 @@ class OctopusEnergy:
 		if mins < 30:
 			mins = 30
 
-		costs = self.octopusGetTariffCosts().copy()
+		costs = self.octopusGetTariffCosts(self.nowUntilTomorrow()).copy()
 
 		if mins > len(costs) * 30 * .8:
 			return None # not going to find a slot taking up more than 80% of the time left

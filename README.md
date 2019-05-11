@@ -40,3 +40,5 @@ In no particular order...
 * Write something to deploy this automatically.
 * Change the function that returns the environment variable postcode to make it retrieve the user's postcode and use that instead. The first part of the postcode is used to find out which electricity region the user is in, so that the right pricing information is used.
 * Give some consideration to removing Pandas - I think that might be very good for the cold start time, as it removes the need for two of the three layers to be unpacked. I'm mostly using it for fairly simple stuff - the most significant thing is using rolling windows to find out when the cheapest time slot of the required length is.
+* Introduce caching. In fact, decouple API retrieval from calls to the lambda function, and retrieve the data daily into S3 or somewhere.
+
