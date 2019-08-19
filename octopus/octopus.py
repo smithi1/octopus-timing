@@ -15,6 +15,9 @@ from pytz import timezone
 
 postCodeLookupFile = 'PC2ED.csv'
 
+class APIError(Exception):
+	pass
+
 class OctopusEnergy:
 
 	octopusAPIVersion = '1'
@@ -100,6 +103,10 @@ class OctopusEnergy:
 	# Get the "agile" product code. Currently there's only one, but this will need to 
 	# be revisited if more appear, so as to figure out which one to use. Currently 
 	# the first one returned is used.
+	
+	# Update 11th June: The is_tracker flag has been unset for Agile Octopus, and there's
+	# now no way to just get Agile tariffs. Incidentally, there's also a new Agile
+	# tariff for sending electricity to the grid.
 	def octopusGetProductCode(self):
 	
 		if self.productCode == None:
@@ -110,7 +117,7 @@ class OctopusEnergy:
 				print('OctopusEnergy: attempting to get product code from API')
 				
 			try:
-				resp = requests.get(url, params={'is_tracker': True})
+				resp = requests.get(url)
 			except requests.exceptions.RequestException as e:
 				print('OctopusEnergy: Product code retrieve from Octopus API failed: {}'.format(str(e)))
 				raise
@@ -120,16 +127,20 @@ class OctopusEnergy:
 			except KeyError:
 				print('OctopusEnergy: No "results" in API response')
 				raise
-				
-			if len(results) > 1:
-				print('OctopusEnergy: More than one product code came back (there were {})'.format(len(resp.json()['results'])))
-			
-			self.productCode = results[0]['code']
-		
-			if self.noisy:
-				print('OctopusEnergy: product code detected as {}'.format(self.productCode))
 
-		return self.productCode
+			# Still only returns the first one found.
+			for obj in results:
+				if obj['code'][:5] == 'AGILE':
+					self.productCode = obj['code']
+					if self.noisy:
+						print('OctopusEnergy: product code detected as {}'.format(self.productCode))
+					return self.productCode
+			
+			raise APIError('Product code starting with AGILE has not been found')
+
+		else:
+			return self.productCode
+		
 
 	# Retrieve the tariff code for the product, and the distribution company responsible
 	# for the user's postcode.

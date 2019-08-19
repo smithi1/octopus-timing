@@ -1,4 +1,4 @@
-Pandas=24.2
+Pandas=0.24.2
 pytz=2018.9
 Flask_Ask=0.9.8
 numpy=1.15.4
