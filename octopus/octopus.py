@@ -60,12 +60,15 @@ class OctopusEnergy:
 		if postcode == None:
 			self.postcode = None
 		else:
+			if self.noisy:
+				print('OctopusEnergy: Postcode supplied as {}'.format(postcode))
+				
 			nonAlphaRE = re.compile('[^A-Z0-9]+')
 
 			self.postcode = nonAlphaRE.sub('', str(postcode).upper())[:-3]
 			
 			if lookupTable['PostCode'].loc[lookupTable['PostCode'] == self.postcode].count() != 1:
-				raise ValueError('"' + postcode + '" is not a known postcode')
+				raise ValueError('"' + self.postcode + '" is not a known postcode')
 				
 			self.distributorCode = lookupTable.loc[lookupTable['PostCode'] == self.postcode]['AreaCodeLetter'].min()
 			

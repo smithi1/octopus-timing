@@ -2,16 +2,26 @@ import os
 import datetime as dt
 
 from flask import Flask
-from flask_ask import Ask, statement, question, session, convert_errors
+from flask_ask import Ask, statement, question, session, convert_errors, context
 from pytz import timezone
 
-from octopus.octopus import OctopusEnergy
+try:
+	import requests
+except ModuleNotFoundError:
+	from botocore.vendored import requests
+
+from octopus.octopus import OctopusEnergy, APIError
 
 # Debug information logged if noisy == True
-noisy = True
+noisy = False
 
 if noisy:
 	print("Loading lambda_function.py module")
+	
+	
+class PostcodeNoAuthorisation(Exception):
+	pass
+
 
 # This file has data mapping postcodes to electricity regions. I hacked it together
 # from various publically available sources. It's not proven to be complete.
@@ -36,14 +46,33 @@ def get_timeframe(o, numberOfSlots):
 	
 	return slotStart, slotFinish
 
-def get_postcode():
-	postCode = os.environ['MY_POSTCODE'] # need to replace this with Alexa user postcode lookup
+def get_postcode(deviceId, apiEndpoint, apiAccessToken):
 	
-	if postCode == '':
-		print("No postcode available, using the postcode for Ilkley Post Office")
-		postCode = 'LS29 8HF'
+	requestURL = "{}/v1/devices/{}/settings/address/countryAndPostalCode".format(apiEndpoint, deviceId)
+
+	requestHeader = {
+		'Accept': 'application/json',
+		'Authorization': 'Bearer {}'.format(apiAccessToken)
+	}
+			 
+	r = requests.get(requestURL, headers=requestHeader)
+		
+	if r.status_code == 403:
+		raise PostcodeNoAuthorisation
+		
+	if r.status_code == 200:
+		postcode = r.json()['postalCode']
+			
+	if r.status_code in [204, 404, 405, 429, 500]:
+		print("Unsupported error calling postcode retrieval API, status: {}".format(r.status_code))
+		raise APIError
 	
-	return postCode
+	if postcode == '': # this should probably test against a postcode matching regex...
+		print("No postcode retrieved")
+		raise APIError
+	
+	return postcode
+
 
 # Convert a number of slots to an English description of their duration.
 # It's used so: The cheapest $RETURN_FROM_THIS_FUNCTION slot runs from ...
@@ -79,18 +108,30 @@ def find_cheapest_slot(Length):
 
 	if noisy:
 		print('find_cheapest_slot() entered - {}'.format(Length))
+
+	# Are we allowed to access the user's postcode?
+	try:
+		postcode = get_postcode(context.System.device.deviceId, context.System.apiEndpoint, context.System.apiAccessToken)
+	except PostcodeNoAuthorisation:
+		print("No postcode permissions, so requesting access to country_and_postal_code")
+		return statement("Please can you visit the Alexa app to authorise me to access \
+			your postcode, so that I can look up which electricity region you are in")\
+			.consent_card("read::alexa:device:all:address:country_and_postal_code")
+	except APIError:
+		print("API Error, so no postcode available")
+		return statement("I'm so sorry, but I can't help - for some reason I can't retrieve your device's postcode.")
 	
 	# Recover gracefully if we didn't catch the slot length
 	if 'Length' in convert_errors:
 		return question("Sorry, could you repeat the length of your required time slot?")
 
-	o = OctopusEnergy(get_postcode())
+	o = OctopusEnergy(postcode)
 
 	durationInSlots = Length.total_seconds() // 1800
 	
 	# Less than half an hour is rounded up to half an hour.
 	if durationInSlots == 0:
-		durationInSlots = 1 
+		durationInSlots = 1
 
 	slotStart, slotFinish = get_timeframe(o, durationInSlots)
 	
@@ -99,6 +140,7 @@ def find_cheapest_slot(Length):
 		return statement("I'm sorry, I can't find you a {} slot - it's too long".format(
 			slotLengthWords(durationInSlots)))
 	
+	# otherwise...
 	result = 'The cheapest {} slot runs from {} to {}'.format(
 			slotLengthWords(durationInSlots),
 			slotStart.strftime('%I:%M%p'), slotFinish.strftime('%I:%M%p'))
