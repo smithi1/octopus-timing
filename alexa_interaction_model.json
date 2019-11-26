@@ -36,7 +36,7 @@
                     ],
                     "samples": [
                         "{Length}",
-                        "a {Length} slot.",
+                        "a {Length} slot",
                         "when the cheapest {Length} slot is",
                         "when the next {Length} slot is",
                         "when is the next {Length} slot",

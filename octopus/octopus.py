@@ -252,7 +252,7 @@ class OctopusEnergy:
 		costs = self.octopusGetTariffCosts(self.nowUntilTomorrow()).copy()
 
 		if mins > len(costs) * 30 * .8:
-			return None # not going to find a slot taking up more than 80% of the time left
+			return None, None # not going to find a slot taking up more than 80% of the time left
 			
 		slots = round(mins/30)
 		
@@ -265,7 +265,7 @@ class OctopusEnergy:
 			
 if __name__ == '__main__':
 
-	o = OctopusEnergy('LS29 8ST', noisy=False)
+	o = OctopusEnergy('LS29 8HF', noisy=False)
 	
 	if o.noisy:
 		print(o.octopusGetProductCode())
