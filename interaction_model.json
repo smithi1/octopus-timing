@@ -1,7 +1,7 @@
 {
     "interactionModel": {
         "languageModel": {
-            "invocationName": "octopus",
+            "invocationName": "agile electricity",
             "intents": [
                 {
                     "name": "AMAZON.CancelIntent",
@@ -35,6 +35,8 @@
                         }
                     ],
                     "samples": [
+                        "to find when the cheapest {Length} slot is",
+                        "find the cheapest {Length} slot",
                         "{Length}",
                         "a {Length} slot",
                         "when the cheapest {Length} slot is",
@@ -43,6 +45,10 @@
                         "when is the cheapest {Length} slot",
                         "what is the cheapest {Length} slot"
                     ]
+                },
+                {
+                    "name": "AMAZON.FallbackIntent",
+                    "samples": []
                 }
             ],
             "types": []
