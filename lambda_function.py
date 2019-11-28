@@ -1,5 +1,6 @@
 import os
 import datetime as dt
+import re
 
 from flask import Flask
 from flask_ask import Ask, statement, question, session, convert_errors, context
@@ -13,7 +14,7 @@ except ModuleNotFoundError:
 from octopus.octopus import OctopusEnergy, APIError
 
 # Debug information logged if noisy == True
-noisy = False
+noisy = True
 
 if noisy:
     print("Loading lambda_function.py module")
@@ -23,6 +24,13 @@ if noisy:
 class PostcodeNoAuthorisation(Exception):
     pass
 
+# Exception for when countryCode is outside of the UK
+class OutOfGeographicalScope(Exception):
+    pass
+    
+# Exception for when postcode doesn't match regex.
+class InvalidPostcode(Exception):
+    pass
 
 # This file has data mapping postcodes to electricity regions. I hacked it together
 # from various publically available sources. It's not proven to be complete.
@@ -30,6 +38,20 @@ postCodeLookupFile = 'PC2ED.csv'
 
 app = Flask(__name__)
 ask = Ask(app, "/")
+
+# Postcode regex matcher.
+def check_postcode(postcode):
+    # Regex from https://stackoverflow.com/questions/164979/regex-for-matching-uk-postcodes
+    pcregex = re.compile(r'^([A-Z][A-HJ-Y]?[0-9][A-Z0-9]? ?[0-9][A-Z]{2}|GIR ?0A{2})$')
+
+    if pcregex.match(postcode.upper()):
+        if noisy:
+            print("Debug: postcode matched UK postcode regex")
+    else:
+        print("Error: not a matching UK postcode: {}".format(postcode))
+        return False
+            
+    return True
 
 def get_timeframe(o, numberOfSlots):
 
@@ -60,17 +82,20 @@ def get_postcode(deviceId, apiEndpoint, apiAccessToken):
         
     if r.status_code == 403:
         raise PostcodeNoAuthorisation
-        
+     
     if r.status_code == 200:
-        postcode = r.json()['postalCode']
-            
+        if r.json()['countryCode'] == 'GB':   
+            postcode = r.json()['postalCode']
+        else:
+            # The skill is only published to UK, but this added in response to Amazon review
+            raise OutOfGeographicalScope
+    
     if r.status_code in [204, 404, 405, 429, 500]:
-        print("Unsupported error calling postcode retrieval API, status: {}".format(r.status_code))
+        print("Error: Unsupported error calling postcode retrieval API, status: {}".format(r.status_code))
         raise APIError
     
-    if postcode == '': # this should probably test against a postcode matching regex...
-        print("No postcode retrieved")
-        raise APIError
+    if check_postcode(postcode) != True: # this tests against a postcode matching regex...
+        raise InvalidPostcode
     
     return postcode
 
@@ -96,7 +121,7 @@ def slotLengthWords(numberOfSlots):
 @ask.launch
 def start_skill():
     if noisy:
-        print('start_skill() entered')
+        print('Debug: start_skill() entered')
         
     welcome_message = 'Hello there, I can tell you the cheapest time to do something that \
         uses a lot of electricity on your Agile Octopus tariff. How long a time slot do \
@@ -109,25 +134,43 @@ def start_skill():
 def find_cheapest_slot(Length):
 
     if noisy:
-        print('find_cheapest_slot() entered - {}'.format(Length))
+        print('Debug: find_cheapest_slot() entered - {}'.format(Length))
 
     # Are we allowed to access the user's postcode?
     try:
         postcode = get_postcode(context.System.device.deviceId, context.System.apiEndpoint, context.System.apiAccessToken)
     except PostcodeNoAuthorisation:
-        print("No postcode permissions, so requesting access to country_and_postal_code")
+        if noisy:
+            print("Debug: No postcode permissions, so requesting access to country_and_postal_code")
         return statement("Please can you visit the Alexa app to authorise me to access \
             your postcode, so that I can look up which electricity region you are in")\
             .consent_card("read::alexa:device:all:address:country_and_postal_code")
+    except OutOfGeographicalScope:
+        print("Error: Run from outside of the UK, so no valid postcode possible")
+        return statement("I'm really sorry, but I can only help you if you're in the \
+            United Kingdom. If you actually *are* in the UK, please check the address in \
+            your device settings in the Alexa app.")
+    except InvalidPostcode:
+        print("Error: doesn't look like a valid postcode")
+        return statement("I'm very sorry, but I don't recognise that postcode. To fix \
+            this, you might try checking the address in your device settings in the \
+            Alexa app.")
     except APIError:
-        print("API Error, so no postcode available")
+        print("Error: API Error, so no postcode available")
         return statement("I'm so sorry, but I can't help - for some reason I can't retrieve your device's postcode.")
     
     # Recover gracefully if we didn't catch the slot length
     if 'Length' in convert_errors:
         return question("Sorry, could you repeat the length of your required time slot?")
 
-    o = OctopusEnergy(postcode)
+    try:
+        o = OctopusEnergy(postcode, noisy=noisy)
+    except ValueError:
+        print("Error: Postcode lookup failed for {}".format(postcode))
+        return statement("I'm so sorry, but I could not find your postcode sector \
+            in my lookup file, so I don't know which electricity region you are in. \
+            Could you check the address in your device settings in the Alexa app? \
+            I've made a note, and will see that the file gets checked too.")
 
     durationInSlots = Length.total_seconds() // 1800
     
@@ -146,6 +189,10 @@ def find_cheapest_slot(Length):
     result = 'The cheapest {} slot runs from {} to {}'.format(
             slotLengthWords(durationInSlots),
             slotStart.strftime('%I:%M%p'), slotFinish.strftime('%I:%M%p'))
+    if noisy:
+        print("Returned: {}".format(result))
+    else:
+        print("Returned result to user without finding errors")
     
     return statement(result)
 
@@ -164,7 +211,7 @@ def help_intent():
         will your high energy consumption run for?")
 
 if noisy:
-    print("Loaded lambda_function.py module")
+    print("Debug: Loaded lambda_function.py module")
 
 def lambda_handler(event, _context):
     return ask.run_aws_lambda(event)

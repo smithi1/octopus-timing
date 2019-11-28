@@ -14,7 +14,7 @@ Subsequently, each time you invoke the Skill, it will request your postcode from
 
 The Skill communicates with Octopus Energy via the publicly available [Octopus Energy API][3], which is a programming interface that allows the Skill to retrieve information from Octopus Energy. At this time, Octopus Energy does not require any identifying account information to access the data used by this Skill. Therefore, no information specific to any account that you may hold with Octopus Energy is currently required or used.
 
-The Skill creates log entries, stored on Amazon’s servers, that are designed to help highlight and then subsequently debug problems that may occur with the Skill. If there is a problem with postcode lookup when you use the Skill, your postcode sector may appear in the log. These log entries cannot be connected back to your identity, Alexa device, or full postcode. The logs are configured to be retained for 90 days and will then be automatically deleted by Amazon.
+The Skill creates log entries, stored on Amazon’s servers, that are designed to help highlight and then subsequently debug problems that may occur with the Skill. If there is a problem with postcode lookup when you use the Skill, your postcode may appear in a log file. These log entries cannot be connected back to you or your Alexa device. The logs are configured to be retained for 90 days and will then be automatically deleted by Amazon.
 
 [1]:	https://octopus.energy/agile/
 [2]:	https://octopus.energy/about-us/
