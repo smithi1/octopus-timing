@@ -17,6 +17,9 @@ postCodeLookupFile = 'PC2ED.csv'
 
 class APIError(Exception):
 	pass
+	
+class RequestedSlotTooLongError(Exception):
+	pass
 
 class OctopusEnergy:
 
@@ -252,10 +255,16 @@ class OctopusEnergy:
 		if mins < 30:
 			mins = 30
 
-		costs = self.octopusGetTariffCosts(self.nowUntilTomorrow()).copy()
+		# We don't have data for requests longer than 40 hours, so no point looking it up
+		if mins > 40*60:
+			raise RequestedSlotTooLongError
 
+		costs = self.octopusGetTariffCosts(self.nowUntilTomorrow()).copy()
+		
+		# Meaningless to find a slot taking up more than 80% of the time for which there
+		# is data.
 		if mins > len(costs) * 30 * .8:
-			return None, None # not going to find a slot taking up more than 80% of the time left
+			raise RequestedSlotTooLongError
 			
 		slots = round(mins/30)
 		

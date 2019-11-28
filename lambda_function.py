@@ -11,7 +11,7 @@ try:
 except ModuleNotFoundError:
     from botocore.vendored import requests
 
-from octopus.octopus import OctopusEnergy, APIError
+from octopus.octopus import OctopusEnergy, APIError, RequestedSlotTooLongError
 
 # Debug information logged if noisy == True
 noisy = True
@@ -53,15 +53,13 @@ def check_postcode(postcode):
             
     return True
 
+# Retrieve the cheapest slot
 def get_timeframe(o, numberOfSlots):
 
     uktz = timezone('Europe/London') # This skill is only meaningful in the UK
 
     slotStart, slotFinish = o.getCheapestSlot(numberOfSlots * 30) # it takes minutes as arg
-    
-    if slotStart == None:
-        return None, None # the requested slot was too long for the data.
-    
+
     # The times from the Octopus API are in UTC, so need converting if we're in summer
     # time at the moment.       
     slotStart = slotStart.astimezone(uktz)
@@ -142,8 +140,8 @@ def find_cheapest_slot(Length):
     except PostcodeNoAuthorisation:
         if noisy:
             print("Debug: No postcode permissions, so requesting access to country_and_postal_code")
-        return statement("Please can you visit the Alexa app to authorise me to access \
-            your postcode, so that I can look up which electricity region you are in")\
+        return statement("Please can you visit the Alexa app and authorise me to access \
+            your postcode, so that I can look up which electricity region you are in.")\
             .consent_card("read::alexa:device:all:address:country_and_postal_code")
     except OutOfGeographicalScope:
         print("Error: Run from outside of the UK, so no valid postcode possible")
@@ -152,14 +150,16 @@ def find_cheapest_slot(Length):
             your device settings in the Alexa app.")
     except InvalidPostcode:
         print("Error: doesn't look like a valid postcode")
-        return statement("I'm very sorry, but I don't recognise that postcode. To fix \
+        return statement("I'm very sorry, but I don't recognise your postcode. To fix \
             this, you might try checking the address in your device settings in the \
             Alexa app.")
-    except APIError:
-        print("Error: API Error, so no postcode available")
-        return statement("I'm so sorry, but I can't help - for some reason I can't retrieve your device's postcode.")
+    except:
+        print("Error: Other Uncaught Error, so no postcode available")
+        return statement("I'm so sorry, but I can't help - for some reason I can't \
+            retrieve your device's postcode.")
     
-    # Recover gracefully if we didn't catch the slot length
+    # Recover gracefully if we didn't catch the slot length - probably won't happen
+    # as we have elicitation on for the Length slot.
     if 'Length' in convert_errors:
         return question("Sorry, could you repeat the length of your required time slot?")
 
@@ -171,6 +171,11 @@ def find_cheapest_slot(Length):
             in my lookup file, so I don't know which electricity region you are in. \
             Could you check the address in your device settings in the Alexa app? \
             I've made a note, and will see that the file gets checked too.")
+    except:
+        print("Error: OctopusEnergy threw an exception which should be logged above")
+        return statement("I'm sorry, but my connection to Octopus Energy appears \
+            to have gone a bit pear shaped, so I can't help you at the moment. \
+            Feel free to try again in a moment?")
 
     durationInSlots = Length.total_seconds() // 1800
     
@@ -178,12 +183,17 @@ def find_cheapest_slot(Length):
     if durationInSlots == 0:
         durationInSlots = 1
 
-    slotStart, slotFinish = get_timeframe(o, durationInSlots)
-    
-    # If no slot of that length is available because it's too long...
-    if slotStart == None:
+    # Retrieve the cheapest slot
+    try:
+        slotStart, slotFinish = get_timeframe(o, durationInSlots)
+    except RequestedSlotTooLongError:
         return statement("I'm sorry, I can't find you a {} slot - it's too long".format(
             slotLengthWords(durationInSlots)))
+    except:
+        print("Error: OctopusEnergy threw an exception which should be logged above")
+        return statement("I'm sorry, but my connection to Octopus Energy appears \
+            to have gone a bit pear shaped, so I can't help you at the moment. \
+            Feel free to try again in a moment?")
     
     # otherwise...
     result = 'The cheapest {} slot runs from {} to {}'.format(
