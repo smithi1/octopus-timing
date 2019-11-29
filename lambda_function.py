@@ -14,7 +14,10 @@ except ModuleNotFoundError:
 from octopus.octopus import OctopusEnergy, APIError, RequestedSlotTooLongError
 
 # Debug information logged if noisy == True
-noisy = True
+if os.environ['NOISY'] == 'True'
+    noisy = True
+else:
+    noisy = False
 
 if noisy:
     print("Loading lambda_function.py module")

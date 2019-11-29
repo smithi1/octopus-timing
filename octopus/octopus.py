@@ -28,7 +28,8 @@ class OctopusEnergy:
 	
 	productCode = None
 	tariffCode = None
-	tariffCosts = None
+	tariffCosts = pd.DataFrame() # empty dataframe
+
 
 	def __init__(self, postcode=None, distributorCode=None, noisy=False):
 	
@@ -57,14 +58,14 @@ class OctopusEnergy:
 			postcode = None
 			
 			if self.noisy:
-				print('OctopusEnergy: Known distributorCode supplied as {}, ignoring any supplied postcode'.format(distributorCode))
+				print('Debug: OctopusEnergy: Known distributorCode supplied as {}, ignoring any supplied postcode'.format(distributorCode))
 	
 		# Handle postcode
 		if postcode == None:
 			self.postcode = None
 		else:
 			if self.noisy:
-				print('OctopusEnergy: Postcode supplied as {}'.format(postcode))
+				print('Debug: OctopusEnergy: Postcode supplied as {}'.format(postcode))
 				
 			nonAlphaRE = re.compile('[^A-Z0-9]+')
 
@@ -76,7 +77,7 @@ class OctopusEnergy:
 			self.distributorCode = lookupTable.loc[lookupTable['PostCode'] == self.postcode]['AreaCodeLetter'].min()
 			
 			if self.noisy:
-				print('OctopusEnergy: Postcode supplied as {}, distributor code looked up as {}'.format(self.postcode, self.distributorCode))
+				print('Debug: OctopusEnergy: Postcode supplied as {}, distributor code looked up as {}'.format(self.postcode, self.distributorCode))
 
 	# Returns the time in the format required by the API, times not on the hour or
 	# half hour are rounded to the next one.		
@@ -120,32 +121,45 @@ class OctopusEnergy:
 			url = self.baseURL + 'products/'
 		
 			if self.noisy:
-				print('OctopusEnergy: attempting to get product code from API')
+				print('Debug: OctopusEnergy: attempting to get product code from API')
 				
 			try:
 				resp = requests.get(url)
 			except requests.exceptions.RequestException as e:
-				print('OctopusEnergy: Product code retrieve from Octopus API failed: {}'.format(str(e)))
+				print('Error: OctopusEnergy: Product code retrieve from Octopus API failed: {}'.format(str(e)))
 				raise
 		
-			try:		
+			try:
 				results = resp.json()['results']
 			except KeyError:
-				print('OctopusEnergy: No "results" in API response')
+				print('Error: OctopusEnergy: No "results" in API response')
 				raise
 
-			# Still only returns the first one found.
-			for obj in results:
-				if obj['code'][:5] == 'AGILE':
-					self.productCode = obj['code']
-					if self.noisy:
-						print('OctopusEnergy: product code detected as {}'.format(self.productCode))
-					return self.productCode
+			# Returns the first one found. There's now an EXPORT version of the
+			# Agile Octopus tariff which is for selling back to the grid - we don't want
+			# that one.
+			productCodes = []
 			
-			raise APIError('Product code starting with AGILE has not been found')
+			for obj in results:
+				if obj['code'][:5] == 'AGILE' and obj['direction'] == 'IMPORT':
+					productCodes.append(obj['code'])
+					
+			# None found, so raise exception.
+			if len(productCodes) == 0:
+				raise APIError('Error: Import Product code starting with AGILE has not been found')
 
-		else:
-			return self.productCode
+			# If we found more than one, I need to know because the picture has changed
+			# and the returns from this code might not be reliable any more.
+			if len(productCodes) > 1:
+				print("Error: OctopusEnergy: warning - multiple product codes starting with AGILE \
+					were found: {}".format(productCodes))
+					
+			self.productCode = productCodes[0]
+			
+			if self.noisy:
+				print('OctopusEnergy: product code detected as {}'.format(self.productCode))
+
+		return self.productCode
 		
 
 	# Retrieve the tariff code for the product, and the distribution company responsible
@@ -156,22 +170,22 @@ class OctopusEnergy:
 			url = self.baseURL + 'products/' + self.octopusGetProductCode() + '/'
 			
 			if self.noisy:
-				print('OctopusEnergy: attempting to get tariff code from API')
+				print('Debug: OctopusEnergy: attempting to get tariff code from API')
 			
 			try:
 				resp = requests.get(url)
 			except requests.exceptions.RequestException as e:
-				print('OctopusEnergy: Tariff retrieve from Octopus API failed: {}'.format(str(e)))
+				print('Error: OctopusEnergy: Tariff retrieve from Octopus API failed: {}'.format(str(e)))
 				raise
 			
 			try:
 				self.tariffCode = resp.json()['single_register_electricity_tariffs'][self.distributorCode]['direct_debit_monthly']['code']
 			except requests.exceptions.RequestException as e:
-				print('OctopusEnergy: Could not retrieve tariff from API results: {}'.format(str(e)))
+				print('Error: OctopusEnergy: Could not retrieve tariff from API results: {}'.format(str(e)))
 				raise
 
 		if self.noisy:
-			print('OctopusEnergy: tariff code detected as {}'.format(self.tariffCode))
+			print('Debug: OctopusEnergy: tariff code detected as {}'.format(self.tariffCode))
 
 		return self.tariffCode
 		
@@ -182,66 +196,69 @@ class OctopusEnergy:
 	def octopusGetTariffCosts(self, timings):
 		
 		uktz = timezone('Europe/London')
-					
-		# Initialise empty DataFrame
-		df = pd.DataFrame()
+		
+		if self.tariffCosts.empty:
+		
+			# Initialise empty DataFrame
+			df = pd.DataFrame()
    
-		url = self.baseURL + 'products/' + self.octopusGetProductCode() + '/electricity-tariffs/' + self.octopusGetTariffCode() + '/standard-unit-rates/'
+			url = self.baseURL + 'products/' + self.octopusGetProductCode() + '/electricity-tariffs/' + self.octopusGetTariffCode() + '/standard-unit-rates/'
 		
-		sleepTime = 0.3
+			sleepTime = 0.1
 		
-		# May want more params at some point.
-		params = timings
+			# May want more params at some point.
+			params = timings
 		
-		if self.noisy:
-			print('OctopusEnergy: attempting to get tariff costs from API')
+			if self.noisy:
+				print('Debug: OctopusEnergy: attempting to get tariff costs from API')
 
-		resp = requests.get(url, params=params)
+			resp = requests.get(url, params=params)
 		
-		nextPage = resp.json()['next']
+			nextPage = resp.json()['next']
 	
-		# Now retrieve pages until the next page is returned as'None' 
-		while nextPage != None:
+			# Now retrieve pages until the next page is returned as'None' 
+			while nextPage != None:
 
-			df_tmp = pd.DataFrame(resp.json()['results'])
+				df_tmp = pd.DataFrame(resp.json()['results'])
 		
+				if df.empty:
+					df = df_tmp
+				else:
+					df = df.append(df_tmp)
+		
+				if self.noisy:
+					print('Debug: OctopusEnergy: Retrieved {} rows, total now {}'.format(len(df_tmp), len(df)))
+		
+				time.sleep(sleepTime)
+		
+				resp = requests.get(nextPage)
+			
+				nextPage = resp.json()['next']
+	
+			# Add the last page retrieved to the result.
+			df_tmp = pd.DataFrame(resp.json()['results'])
+	
+			# Still need this check, in case it was just one page and the loop body
+			# was skipped.
 			if df.empty:
 				df = df_tmp
 			else:
 				df = df.append(df_tmp)
 		
 			if self.noisy:
-				print('OctopusEnergy: Retrieved {} rows, total now {}'.format(len(df_tmp), len(df)))
-		
-			time.sleep(sleepTime)
-		
-			resp = requests.get(nextPage)
-			
-			nextPage = resp.json()['next']
+				print('Debug: OctopusEnergy: Retrieved {} rows, total is {}'.format(len(df_tmp), len(df)))
 	
-		# Add the last page retrieved to the result.
-		df_tmp = pd.DataFrame(resp.json()['results'])
-	
-		# Still need this check, in case it was just one page.
-		if df.empty:
-			df = df_tmp
-		else:
-			df = df.append(df_tmp)
-		
-		if self.noisy:
-			print('OctopusEnergy: Retrieved {} rows, total	is {}'.format(len(df_tmp), len(df)))
-	
-		for col in ['valid_from', 'valid_to']:
-			df[col] = pd.to_datetime(df[col])
+			for col in ['valid_from', 'valid_to']:
+				df[col] = pd.to_datetime(df[col])
 	
 		
-		df = df.set_index('valid_from')
+			df = df.set_index('valid_from')
 	
-		self.tariffCosts = df.drop('value_exc_vat', axis=1)
-		self.tariffCostLastRefresh = dt.datetime.now(timezone('Europe/London'))
+			self.tariffCosts = df.drop('value_exc_vat', axis=1)
+			self.tariffCostLastRefresh = dt.datetime.now(timezone('Europe/London'))
 		
-		if self.noisy:
-			print('OctopusEnergy: I have {} tariff costs from API'.format(len(self.tariffCosts)))
+			if self.noisy:
+				print('Debug: OctopusEnergy: I have {} tariff costs from API'.format(len(self.tariffCosts)))
 		
 		return self.tariffCosts
 
@@ -249,7 +266,7 @@ class OctopusEnergy:
 	def getCheapestSlot(self, mins):
 	
 		if self.noisy:
-			print('OctopusEnergy: Calculating cheapest {} minute time slot'.format(mins))
+			print('Debug: OctopusEnergy: Calculating cheapest {} minute time slot'.format(mins))
 			
 		# Minimum time slot.
 		if mins < 30:
@@ -277,13 +294,13 @@ class OctopusEnergy:
 			
 if __name__ == '__main__':
 
-	o = OctopusEnergy('LS29 8HF', noisy=False)
+	o = OctopusEnergy('LS29 8HF', noisy=True)
 	
 	if o.noisy:
 		print(o.octopusGetProductCode())
 		print(o.octopusGetTariffCode())
-		print(o.octopusGetTariffCosts())
 		print(o.nowUntilTomorrow())
+		print(o.octopusGetTariffCosts(o.nowUntilTomorrow()))
 	tz = timezone('Europe/London')
 	for t in 30, 60, 90, 120, 240:
 		(start, end) = o.getCheapestSlot(t)
