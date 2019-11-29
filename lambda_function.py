@@ -14,7 +14,7 @@ except ModuleNotFoundError:
 from octopus.octopus import OctopusEnergy, APIError, RequestedSlotTooLongError
 
 # Debug information logged if noisy == True
-if os.environ['NOISY'] == 'True'
+if os.environ['NOISY'] == 'True':
     noisy = True
 else:
     noisy = False
@@ -202,10 +202,8 @@ def find_cheapest_slot(Length):
     result = 'The cheapest {} slot runs from {} to {}'.format(
             slotLengthWords(durationInSlots),
             slotStart.strftime('%I:%M%p'), slotFinish.strftime('%I:%M%p'))
-    if noisy:
-        print("Returned: {}".format(result))
-    else:
-        print("Returned result to user without finding errors")
+
+    print("Tariff: {}, Returned: {}".format(o.octopusGetTariffCode(), result))
     
     return statement(result)
 
