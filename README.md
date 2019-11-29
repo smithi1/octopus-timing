@@ -39,7 +39,6 @@ In no particular order...
 * Write something to deploy this automatically.
 * Give some consideration to removing Pandas - I think that might be very good for the cold start time, as it removes the need for two of the three layers to be unpacked. I'm mostly using it for fairly simple stuff - the most significant thing is using rolling windows to find out when the cheapest time slot of the required length is.
 * Introduce some amount of caching. In fact, decouple API retrieval from calls to the lambda function, and retrieve the data daily into S3 or somewhere.
-* Add ‘requests’ module in somewhere, and use that rather than the deprecated version of it inside AWS’s botocore.
 
 [1]:	https://developer.octopus.energy/docs/api/#agile-octopus
 [2]:	https://share.octopus.energy/pale-cobra-742
