@@ -1,0 +1,64 @@
+{
+  "manifest": {
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:us-east-1:003032666781:function:octopusEnergy"
+        },
+        "interfaces": []
+      }
+    },
+    "manifestVersion": "1.0",
+    "permissions": [
+      {
+        "name": "alexa:devices:all:address:country_and_postal_code:read"
+      }
+    ],
+    "privacyAndCompliance": {
+      "locales": {
+        "en-GB": {
+          "privacyPolicyUrl": "https://github.com/smithi1/octopus-timing/blob/master/PRIVACY.md"
+        }
+      },
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    },
+    "publishingInformation": {
+      "locales": {
+        "en-GB": {
+          "name": "Agile Octopus Timing",
+          "smallIconUri": "https://s3.amazonaws.com/CAPS-SSE/echo_developer/4d0a/7dc77c73c46b4299b063b4303374d2f1/APP_ICON?versionId=YBMIhtjhlc3_r80nCvcjrTAC3TbeW05f&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20191201T142519Z&X-Amz-SignedHeaders=host&X-Amz-Expires=86399&X-Amz-Credential=AKIAJFEYRBGIHK2BBYKA%2F20191201%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=8b63e099796bb24d05167cfc36e72b9758085f37fa44e178dd4d304ffea0471e",
+          "largeIconUri": "https://s3.amazonaws.com/CAPS-SSE/echo_developer/16cb/4c058db7a7c54589b2569897b610c255/APP_ICON_LARGE?versionId=OpYXPpZx6AKGcUBoq4is8f.Xf5x9D9aI&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20191201T142519Z&X-Amz-SignedHeaders=host&X-Amz-Expires=86400&X-Amz-Credential=AKIAJFEYRBGIHK2BBYKA%2F20191201%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=f9d0dea55253660c9f4f90f9a037aa3f441d78ec58a86d6a34c846f9420a7db3",
+          "summary": "Find the cheapest time to run the washing machine or charge your car, on Octopus Energy's Agile Octopus tariff.",
+          "description": "If you're a user of the Agile Octopus tariff from Octopus Energy, and you are always on the website finding out the cheapest time to run your washing machine or charge your electric vehicle, then this is for you.\n\nAsk it for the slot length that you need, then time your clothes wash or electric vehicle charge or anything else that uses a lot of power to make them as green and as cheap as possible.",
+          "examplePhrases": [
+            "Alexa, ask agile electricity when the cheapest four hour slot is.",
+            "Alexa, ask agile electricity to find the cheapest 90 minute slot.",
+            "Alexa, open agile electricity"
+          ],
+          "keywords": [
+            "octopus",
+            "energy",
+            "agileoctopus",
+            "octopusenergy",
+            "electricity",
+            "tariff",
+            "flexible",
+            "timing",
+            "green",
+            "cost"
+          ]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "testingInstructions": "You will need to use a device with a UK postcode set in the device's address settings. The skill attempts to download the country/postcode information, and, if access has not been granted, it asks the user to go to the app where there will be a card requesting authorisation.",
+      "category": "SMART_HOME",
+      "distributionCountries": [
+        "GB"
+      ]
+    }
+  }
+}
