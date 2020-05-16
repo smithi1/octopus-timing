@@ -19,9 +19,9 @@ The code itself is fairly small, but it makes use of packages that are not avail
 
 1. Create custom layers in the Lambda console, to allow the module access to the Python 3.7 modules listed in `requirements.txt` (and their dependencies). AWS provide a layer called `AWSLambda-Python37-SciPy1x` which contains numpy and I've provided two more custom layer files - one containing pytz and Pandas (without numpy) and the other with Ask-Flask plus dependencies.  Use mine or build your own, your choice.
 2. Create a new Lambda function, and add the three layers, with the Alexa Skills Kit as the trigger, and provisioned access to CloudWatch logs.
-3. Create a zip file containing the `octopus` folder, `lambda_function.py` and `PC2ED.csv` , and upload using the "Function code" area of the skill editor, and ensure that the runtime is Python 3.7, and the handler box reads `lambda_function.lambda_handler`. You can also use the code editor provided to have an editable version of the code in there.
+3. Create a zip file containing the `octopus` folder and `lambda_function.py` and upload using the "Function code" area of the skill editor, and ensure that the runtime is Python 3.7, and the handler box reads `lambda_function.lambda_handler`. You can also use the code editor provided to have an editable version of the code in there.
 
- The code requires the `octopus` folder, `lambda_function.py`, and `PC2ED.csv` to be  present.
+ The code requires the `octopus` folder and `lambda_function.py` to be  present.
 
 ### Alexa Developer Console Setup
 
