@@ -13,8 +13,6 @@ import datetime as dt
 
 from pytz import timezone
 
-postCodeLookupFile = 'PC2ED.csv'
-
 class APIError(Exception):
 	pass
 	
@@ -39,16 +37,14 @@ class OctopusEnergy:
 		self.noisy = noisy
 		self.productCode = None # Octopus Energy product code for Agile Octopus
 		self.tariffCode = None # Octopus Energy tariff code for user, derived from their postcode
-	
-		# Postcode lookup table
-		lookupTable = pd.read_csv(postCodeLookupFile)
-			
+				
 		# Handle distributorCode
 		if distributorCode == None:
 			self.distributorCode = None
 		else: 
+
 			# Check it's a distributor code that we know about.
-			if distributorCode not in lookupTable['AreaCodeLetter'].unique():
+			if distributorCode not in ['_P', '_N', '_G', '_F', '_M', '_D', '_B', '_E', '_K', '_C', '_A', '_L', '_H', '_J']:
 				raise ValueError('"' + distributorCode + '" is not a known distributorCode')
 				
 			# Remember it	
@@ -71,10 +67,13 @@ class OctopusEnergy:
 
 			self.postcode = nonAlphaRE.sub('', str(postcode).upper())[:-3]
 			
-			if lookupTable['PostCode'].loc[lookupTable['PostCode'] == self.postcode].count() != 1:
-				raise ValueError('"' + self.postcode + '" is not a known postcode')
-				
-			self.distributorCode = lookupTable.loc[lookupTable['PostCode'] == self.postcode]['AreaCodeLetter'].min()
+			try:
+				self.distributorCode = octopusGetDistributorCode(self.postcode)
+			except APIError as e:
+				print("Debug: OctopusEnergy: Error calling Octopus Energy API to get distributor code - {}".format(string(e)))
+				raise
+			except PostcodeError as e:
+				print("Debug: OctopusEnergy: Error in postcode - {}".format(string(e))))
 			
 			if self.noisy:
 				print('Debug: OctopusEnergy: Postcode supplied as {}, distributor code looked up as {}'.format(self.postcode, self.distributorCode))
@@ -106,6 +105,50 @@ class OctopusEnergy:
 		return {
 			'period_from': today, 'period_to': tomorrow
 		}
+
+
+	# Look up the postcode via the API. Replaces the former lookup file.
+	def octopusGetDistributorCode(self, postcode):
+		
+		url = self.baseURL + 'industry/grid-supply-points/'
+		
+		if self.noisy:
+				print("Debug: OctopusEnergy: attempting to get distributor code from postcode: {}".format(postcode))
+
+		try:
+			resp = requests.get(url, params={'postcode': postcode})
+		except requests.exceptions.RequestException as e:
+			print("Error: couldn't retrieve distributor code for postcode=|{}| ".format(postcode))
+			raise APIError(string(e))
+			
+		try:
+			results = resp.json()['results']
+		except KeyError:
+			print('Error: OctopusEnergy: No "results" in API response')
+			raise
+		
+		# No results, perhaps a non-existant postcode
+		if len(results) == 0:
+			print("Error: OctopusEnergy: Could not find a distributor code for postcode=|{}|".format(postcode))
+			raise PostcodeError("No distributor code found for postcode")
+			
+		# too many results - perhaps the postcode was just an area code - LS vs LS29 for example
+		# Apparently, there's a London postcode area with two electricity regions in it, which we just can't handle at the moment.
+		if len(results) > 1:
+			print("Error: OctopusEnergy: {} distributor codes returned for postcode=|{}|".format(len(results), postcode))
+			raise PostcodeError("Postcode too ambiguous")
+
+		try:
+			distCode = results[0]['group_id']
+		except IndexError as e:
+			print(e)
+			raise
+		
+		if self.noisy:
+			print("Debug: OctopusEnergy: Distributor code returned: " + distCode)
+		
+		return distCode
+
 	
 	# Get the "agile" product code. Currently there's only one, but this will need to 
 	# be revisited if more appear, so as to figure out which one to use. Currently 

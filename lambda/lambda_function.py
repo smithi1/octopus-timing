@@ -35,9 +35,6 @@ class OutOfGeographicalScope(Exception):
 class InvalidPostcode(Exception):
     pass
 
-# This file has data mapping postcodes to electricity regions. I hacked it together
-# from various publically available sources. It's not proven to be complete.
-postCodeLookupFile = 'PC2ED.csv'
 
 app = Flask(__name__)
 ask = Ask(app, "/")
@@ -170,10 +167,9 @@ def find_cheapest_slot(Length):
         o = OctopusEnergy(postcode, noisy=noisy)
     except ValueError:
         print("Error: Postcode lookup failed for {}".format(postcode))
-        return statement("I'm so sorry, but I could not find your postcode sector \
-            in my lookup file, so I don't know which electricity region you are in. \
-            Could you check the address in your device settings in the Alexa app? \
-            I've made a note, and will see that the file gets checked too.")
+        return statement("I'm so sorry, but I could not look up your postcode sector, \
+				so I don't know which electricity region you are in. \
+            Could you check the address in your device settings in the Alexa app?")
     except:
         print("Error: OctopusEnergy threw an exception which should be logged above")
         return statement("I'm sorry, but my connection to Octopus Energy appears \
