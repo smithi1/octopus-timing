@@ -68,12 +68,12 @@ class OctopusEnergy:
 			self.postcode = nonAlphaRE.sub('', str(postcode).upper())[:-3]
 			
 			try:
-				self.distributorCode = octopusGetDistributorCode(self.postcode)
+				self.distributorCode = self.octopusGetDistributorCode(self.postcode)
 			except APIError as e:
 				print("Debug: OctopusEnergy: Error calling Octopus Energy API to get distributor code - {}".format(string(e)))
 				raise
 			except PostcodeError as e:
-				print("Debug: OctopusEnergy: Error in postcode - {}".format(string(e))))
+				print("Debug: OctopusEnergy: Error in postcode - {}".format(string(e)))
 			
 			if self.noisy:
 				print('Debug: OctopusEnergy: Postcode supplied as {}, distributor code looked up as {}'.format(self.postcode, self.distributorCode))
@@ -105,7 +105,6 @@ class OctopusEnergy:
 		return {
 			'period_from': today, 'period_to': tomorrow
 		}
-
 
 	# Look up the postcode via the API. Replaces the former lookup file.
 	def octopusGetDistributorCode(self, postcode):
