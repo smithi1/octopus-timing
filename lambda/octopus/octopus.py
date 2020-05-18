@@ -18,6 +18,9 @@ class APIError(Exception):
 	
 class RequestedSlotTooLongError(Exception):
 	pass
+	
+class PostcodeError(Exception):
+    pass
 
 class OctopusEnergy:
 
@@ -65,7 +68,8 @@ class OctopusEnergy:
 				
 			nonAlphaRE = re.compile('[^A-Z0-9]+')
 
-			self.postcode = nonAlphaRE.sub('', str(postcode).upper())[:-3]
+            # don't chop off the second portion - the API wants it
+			self.postcode = nonAlphaRE.sub('', str(postcode).upper()) # [:-3]
 			
 			try:
 				self.distributorCode = self.octopusGetDistributorCode(self.postcode)
