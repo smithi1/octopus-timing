@@ -153,8 +153,8 @@ def find_cheapest_slot(Length):
         return statement("I'm very sorry, but I don't recognise your postcode. To fix \
             this, you might try checking the address in your device settings in the \
             Alexa app.")
-    except:
-        print("Error: Other Uncaught Error, so no postcode available")
+    except Exception as e:
+        print("Error: unexpected error getting postcode from Amazon - {}".format(e))
         return statement("I'm so sorry, but I can't help - for some reason I can't \
             retrieve your device's postcode.")
 
@@ -166,12 +166,12 @@ def find_cheapest_slot(Length):
     try:
         o = OctopusEnergy(postcode, noisy=noisy)
     except ValueError:
-        print("Error: Postcode lookup failed for {}".format(postcode))
+        print("Error: Postcode lookup failed for {}, recommending checking the Alexa app config".format(postcode))
         return statement("I'm so sorry, but I could not look up your postcode sector, \
-				so I don't know which electricity region you are in. \
+            so I don't know which electricity region you are in. \
             Could you check the address in your device settings in the Alexa app?")
-    except:
-        print("Error: OctopusEnergy threw an exception which should be logged above")
+    except Exception as e:
+        print("Error: can't instantiate OctopusEnergy class for that postcode - {}".format(e))
         return statement("I'm sorry, but my connection to Octopus Energy appears \
             to have gone a bit pear shaped, so I can't help you at the moment. \
             Feel free to try again in a moment?")
@@ -189,7 +189,7 @@ def find_cheapest_slot(Length):
         return statement("I'm sorry, I can't find you a {} slot - it's too long".format(
             slotLengthWords(durationInSlots)))
     except:
-        print("Error: OctopusEnergy threw an exception which should be logged above")
+        print("Error: OctopusEnergy threw an exception getting time slots, blaming connectivity")
         return statement("I'm sorry, but my connection to Octopus Energy appears \
             to have gone a bit pear shaped, so I can't help you at the moment. \
             Feel free to try again in a moment?")
