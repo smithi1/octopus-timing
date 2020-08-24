@@ -21,7 +21,10 @@ class RequestedSlotTooLongError(Exception):
 	
 class PostcodeError(Exception):
     pass
-
+    
+class PostcodeAmbiguous(Exception):
+    pass
+    
 class OctopusEnergy:
 
 	octopusAPIVersion = '1'
@@ -77,7 +80,7 @@ class OctopusEnergy:
 				print("Debug: OctopusEnergy: Error calling Octopus Energy API to get distributor code - {}".format(string(e)))
 				raise
 			except PostcodeError as e:
-				print("Debug: OctopusEnergy: Error in postcode - {}".format(string(e)))
+				print("Debug: OctopusEnergy: Error in postcode - {}".format(str(e)))
 			
 			if self.noisy:
 				print('Debug: OctopusEnergy: Postcode supplied as {}, distributor code looked up as {}'.format(self.postcode, self.distributorCode))
@@ -139,7 +142,11 @@ class OctopusEnergy:
 		# Apparently, there's a London postcode area with two electricity regions in it, which we just can't handle at the moment.
 		if len(results) > 1:
 			print("Error: OctopusEnergy: {} distributor codes returned for postcode=|{}|".format(len(results), postcode))
-			raise PostcodeError("Postcode too ambiguous")
+			if len(results) > 2:
+			    andmore = ", and more"
+			else:
+			    andmore = ""
+			raise PostcodeAmbiguous("Got both {} and {}{}.".format(results[0]['group_id'], results[1]['group_id'], andmore))
 
 		try:
 			distCode = results[0]['group_id']

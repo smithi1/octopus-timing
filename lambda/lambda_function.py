@@ -153,6 +153,11 @@ def find_cheapest_slot(Length):
         return statement("I'm very sorry, but I don't recognise your postcode. To fix \
             this, you might try checking the address in your device settings in the \
             Alexa app.")
+    except PostcodeAmbiguous:
+    	print("Error: ambiguous postcode")
+    	return statement("I'm really sorry, but you live in a rare beast of a postcode - one with \
+    		two different electricity regions in it. As things stand, I'm afraid I can't tell which \
+    		you are in, so can't give you an answer. So sorry.")
     except Exception as e:
         print("Error: unexpected error getting postcode from Amazon - {}".format(e))
         return statement("I'm so sorry, but I can't help - for some reason I can't \
